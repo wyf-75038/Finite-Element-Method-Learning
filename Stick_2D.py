@@ -161,7 +161,7 @@ def output_2d(file_name, dig):
 
 
 # FileNameInput = input('请输入输入文件名\n')
-FileNameInput = 'DataInput_2D_Ex1.txt'
+FileNameInput = 'DataInput_2D_1.txt'
 Dig = int(input('请输入计算结果保留小数位数\n'))
 FileNameOutput = 'Result_of_' + FileNameInput
 
