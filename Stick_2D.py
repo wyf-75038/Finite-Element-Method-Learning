@@ -47,10 +47,8 @@ def input_2d(file_name):  # 输入
     force_input = np.zeros((force_node_num, 2))
     force = np.zeros((node_num, 2))
     force_input = evaluate(force_input, force_line, force_node_num)
-    j = 0
-    for i in force_node:
-        force[i-1] = force_input[j]
-        j = j + 1
+    force_node_index = [i - 1 for i in force_node]
+    force[force_node_index] = force_input
 
     con = np.zeros((node_num, 2))
     for i in con_x:
@@ -149,10 +147,10 @@ def output_2d(file_name, dig):
     with open(file_name, "w") as FOutput:
         FOutput.write('2D Bracing System Results\n')
         FOutput.write('U/mm\n')
-        FOutput.write(str((URs * 1000).round(dig)))
+        FOutput.write(str((UResult * 1000).round(dig)))
         FOutput.write('\n')
         FOutput.write('F/kN\n')
-        FOutput.write(str((FRs / 1000).round(dig)))
+        FOutput.write(str((FResult / 1000).round(dig)))
         FOutput.write('\n')
         FOutput.write('sigma/MPa\n')
         FOutput.write(str((Sigma / 10 ** 6).round(dig)))
@@ -160,8 +158,7 @@ def output_2d(file_name, dig):
     return 1
 
 
-# FileNameInput = input('请输入输入文件名\n')
-FileNameInput = 'DataInput_2D_1.txt'
+FileNameInput = input('请输入输入文件名\n')
 Dig = int(input('请输入计算结果保留小数位数\n'))
 FileNameOutput = 'Result_of_' + FileNameInput
 
@@ -178,9 +175,9 @@ Con = Con.ravel()
 U = np.zeros(NodeNum * 2)
 F = Force.ravel()
 
-URs = u_solve()
+UResult = u_solve()
 
-FRs = f_solve()
+FResult = f_solve()
 
 Sigma = sigma_solve()
 
