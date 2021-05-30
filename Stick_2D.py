@@ -116,11 +116,7 @@ def u_solve():
 
     u_result = linalg.solve(k_total_cut, f_cut)
 
-    j = 0
-    for i in index_no_con:
-        U[i] = u_result[j]
-        j = j + 1
-
+    U[index_no_con] = u_result
     urs = U.reshape(NodeNum, 2)
     return urs
 
@@ -137,7 +133,8 @@ def sigma_solve():
     for i in range(0, StickNum):
         ind1 = Stick[i, 0]
         ind2 = Stick[i, 1]
-        u_rs_cut = np.array([[U[2 * ind1 - 2]], [U[2 * ind1 - 1]], [U[2 * ind2 - 2]], [U[2 * ind2 - 1]]])
+        u_rs_cut = np.array([[U[2 * ind1 - 2]], [U[2 * ind1 - 1]],
+                             [U[2 * ind2 - 2]], [U[2 * ind2 - 1]]])
         cap = E / L[i] * np.array([-C[i], -S[i], C[i], S[i]])
         sigma[i] = cap @ u_rs_cut
     return sigma
