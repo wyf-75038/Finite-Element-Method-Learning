@@ -2,21 +2,21 @@ import numpy as np
 from scipy import linalg
 
 
-def input_2d(file_name):  # 输入
+def input_2d(file_name):    # 输入
 
-    def evaluate(var, line_start, line_last):  # 把某几行数据赋给矩阵var
+    def evaluate(var, line_start, line_last):   # 把某几行数据赋给矩阵var
         j = 0
         for i in range(line_start, line_start + line_last):
-            var[j] = lines[i].split(',')
+            var[j] = lines[i].split(',')        # 半角逗号分隔各元素
             j += 1
         return var
 
     with open(file_name) as FInput:
         lines = FInput.readlines()
 
-    line_len = len(lines)
+    line_num = len(lines)
 
-    for i in range(0, line_len):
+    for i in range(0, line_num):
         if lines[i] == 'A\n':
             a = float(lines[i + 1])
         elif lines[i] == 'E\n':
@@ -24,30 +24,30 @@ def input_2d(file_name):  # 输入
         elif lines[i] == 'NodeNum\n':
             node_num = int(lines[i + 1])
         elif lines[i] == 'Node\n':
-            node_line = i + 1  # 记录节点数据开始的行数
+            node_line = i + 1       # 记录节点数据开始的行数
         elif lines[i] == 'StickNum\n':
             stick_num = int(lines[i + 1])
         elif lines[i] == 'Stick\n':
-            stick_line = i + 1  # 记录杆件数据开始的行数
+            stick_line = i + 1      # 记录杆件数据开始的行数
         elif lines[i] == 'ForceNode\n':
             force_node = [int(n) for n in lines[i + 1].split(',')]
         elif lines[i] == 'Force\n':
-            force_line = i + 1  # 记录力数据开始的行数
+            force_line = i + 1      # 记录力数据开始的行数
         elif lines[i] == 'XCon\n':
-            con_x = [int(n) for n in lines[i + 1].split(',')]
+            con_x = [int(n) for n in lines[i + 1].split(',')]  # x方向约束信息
         elif lines[i] == 'YCon\n':
-            con_y = [int(n) for n in lines[i + 1].split(',')]
+            con_y = [int(n) for n in lines[i + 1].split(',')]  # y方向约束信息
 
     node = np.zeros((node_num, 2))
     stick = np.zeros((stick_num, 2))
     node = evaluate(node, node_line, node_num)
     stick = evaluate(stick, stick_line, stick_num)
 
-    force_node_num = len(force_node)
+    force_node_num = len(force_node)  # 有外载荷的节点数
     force_input = np.zeros((force_node_num, 2))
     force = np.zeros((node_num, 2))
     force_input = evaluate(force_input, force_line, force_node_num)
-    force_node_index = [i - 1 for i in force_node]
+    force_node_index = [i - 1 for i in force_node]  # 每个元素减一
     force[force_node_index] = force_input
 
     con = np.zeros((node_num, 2))
@@ -56,8 +56,8 @@ def input_2d(file_name):  # 输入
     for i in con_y:
         con[i - 1, 1] = 1
 
-    stick = stick.astype(int)
-    con = con.astype(int)
+    stick = stick.astype(int)   # 转化为整型
+    con = con.astype(int)       # 转化为整型
     return [a, e, node, node_num, stick, stick_num, force, con]
 
 
@@ -78,8 +78,8 @@ def stick_len_and_angle():  # 求杆件长度和角度
     return [stick_l, c, s]
 
 
-def k_element():
-    k = [0] * StickNum
+def k_element():            # 单元刚度
+    k = [0] * StickNum      # StickNum个元素的全零列表
     for i in range(0, StickNum):
         k[i] = np.array([[C[i] ** 2, C[i] * S[i], -C[i] ** 2, -C[i] * S[i]],
                          [C[i] * S[i], S[i] ** 2, -C[i] * S[i], -S[i] ** 2],
@@ -89,13 +89,15 @@ def k_element():
     return k
 
 
-def k_total(k_element):
+def k_total(k_element):  # 总刚度
     k_total = np.zeros((NodeNum * 2, NodeNum * 2))
 
-    for i in range(0, StickNum):  # 计算总刚
+    for i in range(0, StickNum):
         ind1 = Stick[i, 0]
         ind2 = Stick[i, 1]
+
         k_index = [2 * ind1 - 2, 2 * ind1 - 1, 2 * ind2 - 2, 2 * ind2 - 1]
+        # 某个单元刚度矩阵每行每列在总刚度矩阵中的位置索引
 
         jj = 0
         for j in k_index:
@@ -107,27 +109,27 @@ def k_total(k_element):
     return k_total
 
 
-def u_solve():
-    index_no_con = np.argwhere(Con == 0).ravel()
+def u_solve():  # 求解位移
+    index_no_con = np.argwhere(Con == 0).ravel()    # 找到没有约束的节点的索引
 
-    f_cut = F[index_no_con]
-    k_total_cut = KTotal[index_no_con]
-    k_total_cut = k_total_cut[:, index_no_con]
+    f_cut = F[index_no_con]                         # 缩减力向量
+    k_total_cut = KTotal[index_no_con]              # 缩减总刚度矩阵向量的行
+    k_total_cut = k_total_cut[:, index_no_con]      # 缩减总刚度矩阵向量的列
 
-    u_result = linalg.solve(k_total_cut, f_cut)
+    u_result = linalg.solve(k_total_cut, f_cut)     # 求解线性方程组
 
-    U[index_no_con] = u_result
-    urs = U.reshape(NodeNum, 2)
-    return urs
+    U[index_no_con] = u_result                      # 将结果填写在没有约束的位置
+    u_rs = U.reshape(NodeNum, 2)                    # 将U整形为2列的矩阵
+    return u_rs
 
 
-def f_solve():
-    f = KTotal @ U
-    f_rs = f.reshape(NodeNum, 2)
+def f_solve():  # 求解力（包括载荷和支反力）
+    f = KTotal @ U                  # 点乘
+    f_rs = f.reshape(NodeNum, 2)    # 将f整形为2列的矩阵
     return f_rs
 
 
-def sigma_solve():
+def sigma_solve():  # 求解应力
     sigma = np.zeros(StickNum)
 
     for i in range(0, StickNum):
@@ -135,8 +137,8 @@ def sigma_solve():
         ind2 = Stick[i, 1]
         u_rs_cut = np.array([[U[2 * ind1 - 2]], [U[2 * ind1 - 1]],
                              [U[2 * ind2 - 2]], [U[2 * ind2 - 1]]])
-        cap = E / L[i] * np.array([-C[i], -S[i], C[i], S[i]])
-        sigma[i] = cap @ u_rs_cut
+        c_ap = E / L[i] * np.array([-C[i], -S[i], C[i], S[i]])   # [C']
+        sigma[i] = c_ap @ u_rs_cut   # 点乘
     return sigma
 
 
