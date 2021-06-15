@@ -14,9 +14,9 @@ def input_3d(file_name):  # 输入
     with open(file_name) as FInput:
         lines = FInput.readlines()
 
-    line_len = len(lines)
+    line_num = len(lines)
 
-    for i in range(0, line_len):
+    for i in range(0, line_num):
         if lines[i] == 'A\n':
             a = float(lines[i + 1])
         elif lines[i] == 'E\n':
@@ -62,6 +62,7 @@ def input_3d(file_name):  # 输入
 
     stick = stick.astype(int)
     con = con.astype(int)
+    con = con.ravel()
     return [a, e, node, node_num, stick, stick_num, force, con]
 
 
@@ -117,24 +118,26 @@ def k_total(k_element):
     return k_total
 
 
-def u_solve():
-    index_no_con = np.argwhere(Con == 0).ravel()
+def u_solve():  # 求解位移
+    index_no_con = np.argwhere(Con == 0).ravel()  # 找到没有约束的节点的索引
 
-    f_cut = F[index_no_con]
-    k_total_cut = KTotal[index_no_con]
-    k_total_cut = k_total_cut[:, index_no_con]
+    f_input_vector = Force.ravel()  # 展开为向量格式
+    f_cut = f_input_vector[index_no_con]  # 缩减力向量
+    k_total_cut = KTotal[index_no_con]  # 缩减总刚度矩阵向量的行
+    k_total_cut = k_total_cut[:, index_no_con]  # 缩减总刚度矩阵向量的列
 
-    u_result = linalg.solve(k_total_cut, f_cut)
+    u_result = linalg.solve(k_total_cut, f_cut)  # 求解线性方程组
 
-    U[index_no_con] = u_result
-    urs = U.reshape(NodeNum, 3)
-    return urs
+    u_vector = np.zeros(NodeNum * 3)
+    u_vector[index_no_con] = u_result  # 将结果填写在没有约束的位置
+    u_matrix = u_vector.reshape(NodeNum, 3)  # 将u_vector整形为2列的矩阵
+    return u_matrix, u_vector
 
 
-def f_solve():
-    f = KTotal @ U
-    f_rs = f.reshape(NodeNum, 3)
-    return f_rs
+def f_solve():  # 求解力（包括载荷和支反力）
+    f_vector = KTotal @ UVector  # 点乘
+    f_matrix = f_vector.reshape(NodeNum, 3)  # 将f整形为3列的矩阵
+    return f_matrix
 
 
 def sigma_solve():
@@ -143,48 +146,79 @@ def sigma_solve():
     for i in range(0, StickNum):
         ind1 = Stick[i, 0]
         ind2 = Stick[i, 1]
-        u_rs_cut = np.array([[U[3 * ind1 - 3]], [U[3 * ind1 - 2]], [U[3 * ind1 - 1]],
-                             [U[3 * ind2 - 3]], [U[3 * ind2 - 2]], [U[3 * ind2 - 1]]])
-        cap = E / L[i] * np.array([-Cx[i], -Cy[i], -Cz[i], Cx[i], Cy[i], Cz[i]])
-        sigma[i] = cap @ u_rs_cut
+        u_cut = np.array([[UVector[3 * ind1 - 3]], [UVector[3 * ind1 - 2]], [UVector[3 * ind1 - 1]],
+                          [UVector[3 * ind2 - 3]], [UVector[3 * ind2 - 2]], [UVector[3 * ind2 - 1]]])
+        c_ap = E / L[i] * np.array([-Cx[i], -Cy[i], -Cz[i], Cx[i], Cy[i], Cz[i]])
+        sigma[i] = c_ap @ u_cut
     return sigma
 
 
 def output_3d(file_name, dig):
-    with open(file_name, "w") as FOutput:
-        FOutput.write('3D Bracing System Results\n')
+    def add_seq(matrix):
+        line = matrix.shape[0]
+        seq = np.array([i for i in range(1, line + 1)])
+        seq = seq.reshape(line, 1)
+        seq_add_matrix = np.block([[seq, matrix]])
+        return seq_add_matrix
+
+    u_output = add_seq(UMatrix * 1000).round(dig)
+    f_output = add_seq(FMatrix / 1000).round(dig)
+
+    sigma_line = Sigma.shape[0]
+    sigma_t = Sigma.reshape(sigma_line, 1)
+
+    sigma_output = add_seq(sigma_t / 10 ** 6).round(dig)
+
+    with open(file_name, 'w') as FOutput:
+        FOutput.write('3D Truss System Results\n')
         FOutput.write('U/mm\n')
-        FOutput.write(str((UResult * 1000).round(dig)))
+        FOutput.write(str(u_output))
         FOutput.write('\n')
         FOutput.write('F/kN\n')
-        FOutput.write(str((FResult / 1000).round(dig)))
+        FOutput.write(str(f_output))
         FOutput.write('\n')
         FOutput.write('sigma/MPa\n')
-        FOutput.write(str((Sigma / 10 ** 6).round(dig)))
+        FOutput.write(str(sigma_output))
         FOutput.write('\n')
     return 1
 
 
-# FileNameInput = input('请输入输入文件名\n')
-FileNameInput = 'DataInput_3D_Ex1.txt'
-Dig = int(input('请输入计算结果保留小数位数\n'))
-FileNameOutput = 'Result_of_' + FileNameInput
+def whether_default(var, default, var_type):
+    if len(var.strip(' ')) == 0 or var.lower() == 'default':  # “default”不区分大小写
+        var = var_type(default)
+    else:
+        var = var_type(var)
+    return var
 
+
+DigDefault = 3
+
+FileNameInput = input('请输入输入文件名：\n')
+print('以下内容不输入或输入空格或输入“default”，则使用默认值。')
+print('请输入计算结果保留小数位数，默认值为', DigDefault, '：')
+Dig = input()
+
+if FileNameInput[-4:] != '.txt':  # 如果最后4个字符不是“.txt”
+    FileNameInput = FileNameInput + '.txt'  # 防止用户忘记输入后缀名
+
+Dig = whether_default(Dig, DigDefault, int)
+
+TxtNameOutput = 'Result_of_' + FileNameInput
 
 [A, E, Node, NodeNum, Stick, StickNum, Force, Con] = input_3d(FileNameInput)
+
 [L, Cx, Cy, Cz] = stick_len_and_angle()
 
 KElement = k_element()
+
 KTotal = k_total(KElement)
 
-Con = Con.ravel()
-U = np.zeros(NodeNum * 3)
-F = Force.ravel()
+[UMatrix, UVector] = u_solve()
 
-UResult = u_solve()
-FResult = f_solve()
+FMatrix = f_solve()
+
 Sigma = sigma_solve()
 
-output_3d(FileNameOutput, Dig)
+output_3d(TxtNameOutput, Dig)
 
-print('Done Successfully at', FileNameOutput)
+print('计算完成，输出文件请见', TxtNameOutput, '。')
