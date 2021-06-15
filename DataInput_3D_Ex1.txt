@@ -1,4 +1,4 @@
-3D Input.Please use basic SI units.
+3D Input, SI units.
 A
 0.005
 E
