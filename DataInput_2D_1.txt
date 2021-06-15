@@ -1,4 +1,4 @@
-2D Input.Please use basic SI units.
+2D Input, SI units.
 A
 0.0006
 E
